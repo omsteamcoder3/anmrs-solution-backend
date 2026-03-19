@@ -44,6 +44,12 @@ const categorySchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
     },
+    // ✅ ADD THIS
+    description: {
+      type: String,
+      default: "",
+      trim: true,
+    },
 
     fields: {
       type: [fieldSchema],

@@ -8,7 +8,7 @@ import asyncHandler from 'express-async-handler';
 // ✅ Create Category
 export const createCategory = async (req, res) => {
     try {
-        const { name, fields } = req.body;
+        const { name,description, fields } = req.body;
 
         if (!name) {
             return res.status(400).json({
@@ -50,6 +50,7 @@ export const createCategory = async (req, res) => {
         const category = new Category({
             name: name.trim(),
             slug,
+            description,
             fields: formattedFields
         });
 
@@ -120,7 +121,7 @@ export const getCategoryBySlug = async (req, res) => {
 export const updateCategory = async (req, res) => {
     try {
         const { slug } = req.params;
-        const { name, fields } = req.body;
+        const { name,description, fields } = req.body;
 
         const category = await Category.findOne({ slug });
         if (!category) {
@@ -155,6 +156,9 @@ export const updateCategory = async (req, res) => {
             // Update name and slug
             category.name = name.trim();
             category.slug = newSlug;
+        }
+   if (description !== undefined) {
+            category.description = description; // ✅ update
         }
 
         // Update fields if provided
