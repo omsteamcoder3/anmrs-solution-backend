@@ -18,7 +18,8 @@ import statsRoutes from './routes/statsRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
-
+import aboutRoutes from './routes/aboutRoutes.js';
+import whatWeOfferRoutes from './routes/whatWeOfferRoutes.js';
 // -------------------------------
 // 🔧 Load .env correctly
 // -------------------------------
@@ -41,25 +42,22 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
       'http://localhost:3000',
       'http://localhost:3001',
       'http://localhost:5173',
-      'http://localhost:5174'  // ✅ ADD YOUR FRONTEND PORT HERE
-    ]; // Default fallback
+      'http://localhost:5174'
+    ];
 
 console.log("✅ Allowed Origins:", allowedOrigins);
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, etc.)
     if (!origin) {
       console.log("⚠️  No origin header - allowing request");
       return callback(null, true);
     }
 
-    // Check if origin is in allowed list
     if (allowedOrigins.includes(origin)) {
       console.log(`✅ Allowed CORS for: ${origin}`);
       return callback(null, true);
     } 
-    // Check for subdomain variations
     else if (origin.endsWith('localhost:5174') || origin.endsWith('localhost:5173')) {
       console.log(`✅ Allowed CORS for localhost variation: ${origin}`);
       return callback(null, true);
@@ -74,7 +72,7 @@ const corsOptions = {
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   exposedHeaders: ['Content-Length', 'X-Total-Count'],
-  maxAge: 86400 // 24 hours
+  maxAge: 86400
 };
 
 // ✅ USE CORS ONLY ONCE
@@ -84,9 +82,15 @@ app.use(cors(corsOptions));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+import publicRoutes from './routes/publicRoutes.js';
+app.use('/api/public', publicRoutes);
+
 // Static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// ✅ ABOUT ROUTE - MUST BE BEFORE adminRoutes
+app.use('/api/admin/about', aboutRoutes);
+app.use('/api/public/what-we-offer', whatWeOfferRoutes);
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -101,8 +105,7 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/contacts', contactRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/settings', settingsRoutes);
-app.use('/api/admin/settings', settingsRoutes); // ADD THIS LINE
-
+app.use('/api/admin/settings', settingsRoutes);
 
 app.get('/', (req, res) => res.json({ message: 'E-commerce backend running' }));
 
@@ -112,7 +115,6 @@ app.get('/', (req, res) => res.json({ message: 'E-commerce backend running' }));
 const MONGO_URI = process.env.MONGO_URI;
 global.JWT_SECRET = process.env.JWT_SECRET;
 
-// Validate Mongo URI early
 if (!MONGO_URI) {
   console.error("❌ ERROR: MONGO_URI is missing. Check your .env file!");
   process.exit(1);
