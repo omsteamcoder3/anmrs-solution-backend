@@ -281,7 +281,7 @@ const fetchAboutContent = async () => {
     setLoading(true)
     setError(null)
     
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002"
+    const API_URL = process.env.NEXT_PUBLIC_API_URL 
     // ✅ CHANGE THIS URL
     const response = await fetch(`${API_URL}/api/public/about`)
     
