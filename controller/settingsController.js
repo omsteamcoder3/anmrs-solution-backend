@@ -73,7 +73,7 @@ export const updateSettings = async (req, res) => {
       razorpayKeyId,
       razorpayKeySecret,
       cashOnDeliveryEnabled,
-      
+      businessHours,
       // BANK ACCOUNT DETAILS
       bankName,
       accountHolderName,
@@ -246,6 +246,7 @@ export const updateSettings = async (req, res) => {
     if (callNumber !== undefined) settings.callNumber = callNumber;
     if (contactEmail !== undefined) settings.contactEmail = contactEmail;
     if (companyAddress !== undefined) settings.companyAddress = companyAddress;
+    if (businessHours !== undefined) settings.businessHours = businessHours;
     if (siteName !== undefined) settings.siteName = siteName;
     if (siteTitle !== undefined) settings.siteTitle = siteTitle;
     if (siteDescription !== undefined) settings.siteDescription = siteDescription;

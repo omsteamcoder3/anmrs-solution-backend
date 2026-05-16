@@ -101,7 +101,10 @@ const settingSchema = new mongoose.Schema({
     type: String,
     default: '123 Street, City, Country'
   },
-  
+  businessHours: {
+  type: String,
+  default: 'Mon–Fri · 9AM–6PM'
+},
   // Site Settings
   siteName: {
     type: String,
@@ -584,7 +587,7 @@ settingSchema.statics.getPublicSettings = async function() {
     callNumber: settings.callNumber,
     contactEmail: settings.contactEmail,
     companyAddress: settings.companyAddress,
-    
+    businessHours: settings.businessHours,
     // Site Settings
     siteName: settings.siteName,
     siteTitle: settings.siteTitle,
