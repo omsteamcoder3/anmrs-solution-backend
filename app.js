@@ -91,6 +91,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ✅ ABOUT ROUTE - MUST BE BEFORE adminRoutes
 app.use('/api/admin/about', aboutRoutes);
+app.use('/api/public/about', aboutRoutes);
 app.use('/api/admin/what-we-offer', whatWeOfferRoutes);
 app.use('/api/public/what-we-offer', whatWeOfferRoutes);
 // Routes

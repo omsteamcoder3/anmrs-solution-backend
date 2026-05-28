@@ -79,10 +79,6 @@ export const updateWhatWeOfferContent = async (req, res) => {
 // Upload service image
 export const uploadServiceImage = async (req, res) => {
   try {
-    console.log('Upload request received');
-    console.log('Files:', req.files);
-    console.log('Body:', req.body);
-    
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
         success: false,
@@ -91,25 +87,22 @@ export const uploadServiceImage = async (req, res) => {
     }
 
     const uploadedFile = req.files[0];
-    console.log('Uploaded file:', uploadedFile);
-    
-    // Get the base URL from the request
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+    // SAVE ONLY RELATIVE PATH
     const imageUrl = `/uploads/${uploadedFile.filename}`;
-    const fullImageUrl = `${baseUrl}${imageUrl}`;
-    
-    console.log('Image URL:', fullImageUrl);
 
     res.status(200).json({
       success: true,
       message: 'Image uploaded successfully',
       data: {
-        imageUrl: fullImageUrl,
+        imageUrl,
         filename: uploadedFile.filename
       }
     });
+
   } catch (error) {
     console.error('Error uploading image:', error);
+
     res.status(500).json({
       success: false,
       message: 'Error uploading image',
