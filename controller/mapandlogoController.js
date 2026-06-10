@@ -39,9 +39,6 @@ export const getMapAndLogoSettings = async (req, res) => {
 // @route   PUT /api/admin/map-logo
 // @access  Private/Admin
 export const updateMapAndLogoSettings = async (req, res) => {
-  console.log('🔵 PUT request received');
-  console.log('🔵 Request body:', req.body);
-  
   try {
     const {
       logoAlt,
@@ -55,34 +52,25 @@ export const updateMapAndLogoSettings = async (req, res) => {
       settings = new MapAndLogo();
     }
 
-    // Update text fields
-    if (logoAlt !== undefined) settings.logoAlt = logoAlt;
-    if (logoLink !== undefined) settings.logoLink = logoLink;
-    if (mapEmbedUrl !== undefined) settings.mapEmbedUrl = mapEmbedUrl;
-    if (isActive !== undefined) settings.isActive = isActive === 'true' || isActive === true;
-
-    if (req.user && req.user._id) {
-      settings.updatedBy = req.user._id;
-    }
+    // Update ALL fields including mapEmbedUrl
+    settings.logoAlt = logoAlt !== undefined ? logoAlt : settings.logoAlt;
+    settings.logoLink = logoLink !== undefined ? logoLink : settings.logoLink;
+    settings.mapEmbedUrl = mapEmbedUrl !== undefined ? mapEmbedUrl : settings.mapEmbedUrl;
+    settings.isActive = isActive !== undefined ? (isActive === 'true' || isActive === true) : settings.isActive;
 
     await settings.save();
     
-    console.log('✅ Settings saved successfully!');
-
     res.status(200).json({
       success: true,
-      message: 'Settings updated successfully',
       data: settings
     });
   } catch (error) {
-    console.error('❌ Error updating settings:', error);
     res.status(500).json({
       success: false,
       message: error.message
     });
   }
 };
-
 // @desc    Upload logo image
 // @route   POST /api/admin/map-logo/upload/logo
 // @access  Private/Admin

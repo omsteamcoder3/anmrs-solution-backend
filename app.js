@@ -22,6 +22,9 @@ import aboutRoutes from './routes/aboutRoutes.js';
 import whatWeOfferRoutes from './routes/whatWeOfferRoutes.js';
 import clientRoutes from './routes/clientRoutes.js';
 import mapAndLogoRoutes from './routes/mapandlogoRoutes.js';
+import designOrderRoutes from './routes/designOrderRoutes.js';
+
+import './models/UserModel.js';
 // -------------------------------
 // 🔧 Load .env correctly
 // -------------------------------
@@ -113,6 +116,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/admin/settings', settingsRoutes);
 app.use('/api/clients', clientRoutes);
+app.use('/api/design-orders', designOrderRoutes);
 
 
 app.get('/', (req, res) => res.json({ message: 'E-commerce backend running' }));
