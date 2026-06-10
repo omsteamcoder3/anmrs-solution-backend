@@ -59,11 +59,10 @@ const cartSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Calculate totals before saving
-cartSchema.pre('save', function(next) {
+// Calculate totals before saving - NO next parameter for Mongoose 8.x
+cartSchema.pre('save', function() {
   this.totalItems = this.items.reduce((total, item) => total + item.quantity, 0);
   this.totalPrice = this.items.reduce((total, item) => total + (item.price * item.quantity), 0);
-  next();
 });
 
 const Cart = mongoose.model('Cart', cartSchema);

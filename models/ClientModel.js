@@ -30,18 +30,16 @@ const clientSchema = new mongoose.Schema({
   }
 });
 
-// Update timestamp on save
-clientSchema.pre('save', function(next) {
+// Update timestamp on save - NO next parameter
+clientSchema.pre('save', function() {
   this.updatedAt = Date.now();
-  next();
 });
 
-// Create slug from name before saving
-clientSchema.pre('save', function(next) {
+// Create slug from name before saving - NO next parameter
+clientSchema.pre('save', function() {
   if (this.isModified('name')) {
     this.slug = this.name.toLowerCase().replace(/\s+/g, '-');
   }
-  next();
 });
 
 const Client = mongoose.model('Client', clientSchema);

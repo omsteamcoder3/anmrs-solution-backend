@@ -208,8 +208,8 @@ categoryAttributes: {
     }
 });
 
-// ✅ Generate variant slugs and calculate total stock
-productSchema.pre('save', async function (next) {
+// ✅ Generate variant slugs and calculate total stock - NO next parameter
+productSchema.pre('save', async function () {
     // Generate main product slug
     if (this.isModified('name')) {
         const baseSlug = slugify(this.name, { lower: true, strict: true });
@@ -247,12 +247,10 @@ productSchema.pre('save', async function (next) {
         const totalStock = this.variants.reduce((sum, variant) => sum + (variant.stock || 0), 0);
         this.stock = totalStock;
     }
-
-    next();
 });
 
-// ✅ Auto Increment S.No
-productSchema.pre('save', async function (next) {
+// ✅ Auto Increment S.No - NO next parameter
+productSchema.pre('save', async function () {
     if (this.isNew) {
         try {
             const lastProduct = await this.constructor
@@ -262,7 +260,6 @@ productSchema.pre('save', async function (next) {
             this.sNo = Date.now();
         }
     }
-    next();
 });
 
 // ✅ Indexes

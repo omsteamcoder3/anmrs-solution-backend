@@ -60,8 +60,8 @@ const categorySchema = new mongoose.Schema(
 );
 
 
-// Auto-generate slug from name
-categorySchema.pre("validate", function (next) {
+
+categorySchema.pre("validate", function () {
   if (this.name) {
     this.slug = slugify(this.name, {
       lower: true,
@@ -69,7 +69,6 @@ categorySchema.pre("validate", function (next) {
       trim: true,
     });
   }
-  next();
 });
 
 const Category =

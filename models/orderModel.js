@@ -200,8 +200,8 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// 🆔 Auto-generate clean unique orderId (ORD-YYYYMMDD-XXXXXX)
-orderSchema.pre('save', async function (next) {
+// 🆔 Auto-generate clean unique orderId (ORD-YYYYMMDD-XXXXXX) - NO next parameter
+orderSchema.pre('save', async function () {
   if (this.isNew && !this.orderId) {
     try {
       let unique = false;
@@ -229,11 +229,10 @@ orderSchema.pre('save', async function (next) {
       this.orderId = `ORD-${Date.now()}`;
     }
   }
-  next();
 });
 
-// 🔢 Auto-increment S.No before saving new orders
-orderSchema.pre('save', async function (next) {
+// 🔢 Auto-increment S.No before saving new orders - NO next parameter
+orderSchema.pre('save', async function () {
   if (this.isNew) {
     try {
       const lastOrder = await this.constructor.findOne({}, {}, { sort: { 'sNo': -1 } });
@@ -243,11 +242,10 @@ orderSchema.pre('save', async function (next) {
       this.sNo = Date.now();
     }
   }
-  next();
 });
 
-// ✅ Calculate amounts before saving
-orderSchema.pre('save', function (next) {
+// ✅ Calculate amounts before saving - NO next parameter
+orderSchema.pre('save', function () {
   // Calculate subtotal (sum of price * quantity for all products)
   if (this.products && this.products.length > 0) {
     this.subtotal = this.products.reduce((total, item) => {
@@ -270,7 +268,6 @@ orderSchema.pre('save', function (next) {
       this.totalAmount = this.subtotal;
     }
   }
-  next();
 });
 
 // ✅ Indexes for better performance
