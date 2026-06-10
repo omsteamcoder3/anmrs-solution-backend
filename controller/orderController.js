@@ -372,159 +372,201 @@ const generateReceiptPDFBuffer = (receiptData) => {
 // @desc    Create new order (for registered users) - FIXED VERSION
 // @route   POST /api/orders
 // @access  Private
+// @desc    Create new order (for registered users) - FIXED VERSION
+// @route   POST /api/orders
+// @access  Private
+
 export const createOrder = async (req, res) => {
   try {
-    const { shippingAddress, paymentMethod, paymentId, variantSelections } = req.body;
-
+    const { shippingAddress, paymentMethod, paymentId, variantSelections, skipCartClear, products: bodyProducts } = req.body;
     console.log('Creating order for user:', req.user.id);
     console.log('Payment method:', paymentMethod);
+    console.log('skipCartClear:', skipCartClear);
+    console.log('bodyProducts:', bodyProducts);
 
-    // Get user's cart with proper population
-    const cart = await Cart.findOne({ user: req.user.id })
-      .populate({
-        path: 'items.product',
-        model: 'Product',
-        select: 'name basePrice stock images variants'
-      });
-
-    if (!cart || cart.items.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cart is empty',
-      });
-    }
-
-    // DEBUG: Log cart items with prices
-    console.log('DEBUG - Cart items:');
-    cart.items.forEach((item, index) => {
-      console.log(`Item ${index + 1}:`, {
-        productName: item.product?.name,
-        productId: item.product?._id,
-        variantId: item.variantId,
-        variantName: item.variantName,
-        quantity: item.quantity,
-        priceFromCart: item.price, // This is what matters!
-        priceType: typeof item.price
-      });
-    });
-
-    // Calculate totals with variant support
+    let productsToOrder = [];
     let totalAmount = 0;
-    const products = [];
 
-    console.log('Processing cart items:', cart.items.length);
-
-    for (const item of cart.items) {
-      // Check if product exists and is properly populated
-      if (!item.product || !item.product._id) {
-        console.error('Invalid product in cart item:', item);
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid product in cart',
-        });
-      }
-
-      const product = await Product.findById(item.product._id);
-      
-      if (!product) {
-        return res.status(400).json({
-          success: false,
-          message: `Product not found`,
-        });
-      }
-
-      // ✅ FIX 1: Use price from cart item (it's already correct: 299 or 499)
-      const price = item.price;
-      
-      // ✅ FIX 2: Use variant info from cart item
-      const variantId = item.variantId;
-      const variantName = item.variantName || '';
-      
-      // Get variant details
-      let variant = null;
-      if (variantId && product.variants && product.variants.length > 0) {
-        variant = product.variants.find(v => 
-          v._id.toString() === variantId
-        );
-      }
-      
-      // Determine original price
-      let originalPrice = price;
-      
-      // If we have variant, get original price from variant
-      if (variant) {
-        originalPrice = variant.originalPrice || variant.price || price;
-      }
-
-      // ✅ FIX 3: Validate price from cart
-      if (typeof price !== 'number' || isNaN(price) || price <= 0) {
-        console.error('Invalid price from cart:', {
-          productId: product._id,
-          productName: product.name,
-          cartPrice: price,
-          variantName
-        });
-        return res.status(400).json({
-          success: false,
-          message: `Invalid price for ${product.name}`
-        });
-      }
-
-      // Check stock based on variant
-      if (variant) {
-        if (variant.stock < item.quantity) {
+    // ✅ FIX: If skipCartClear is true (Buy Now mode), use products from request body
+    if (skipCartClear && bodyProducts && bodyProducts.length > 0) {
+      console.log('🛒 Buy Now mode - Using products from request body');
+      for (const item of bodyProducts) {
+        const product = await Product.findById(item.product);
+        if (!product) {
           return res.status(400).json({
             success: false,
-            message: `Insufficient stock for ${product.name} - ${variantName}`
+            message: `Product not found: ${item.product}`
           });
         }
-      } else if (product.stock < item.quantity) {
-        // Check product stock for non-variant purchases
+
+        const price = item.price;
+        const variantId = item.variantId;
+        const variantName = item.variantName || '';
+        let variant = null;
+        let originalPrice = price;
+
+        if (variantId && product.variants && product.variants.length > 0) {
+          variant = product.variants.find(v => v._id.toString() === variantId);
+          if (variant) {
+            originalPrice = variant.originalPrice || variant.price || price;
+          }
+        }
+
+        // Check stock
+        if (variant) {
+          if (variant.stock < item.quantity) {
+            return res.status(400).json({
+              success: false,
+              message: `Insufficient stock for ${product.name} - ${variantName}`
+            });
+          }
+        } else if (product.stock < item.quantity) {
+          return res.status(400).json({
+            success: false,
+            message: `Insufficient stock for ${product.name}`
+          });
+        }
+
+        const itemTotal = item.quantity * price;
+        totalAmount += itemTotal;
+
+        let discountPercentage = 0;
+        if (originalPrice > price) {
+          discountPercentage = Math.round(((originalPrice - price) / originalPrice) * 100);
+        }
+
+        const productImage = product.images && product.images.length > 0
+          ? product.images[0].image
+          : null;
+
+        productsToOrder.push({
+          product: product._id,
+          variantId: variantId,
+          variantName: variantName,
+          quantity: item.quantity,
+          price: price,
+          originalPrice: originalPrice,
+          discountPercentage: discountPercentage,
+          name: product.name,
+          image: productImage,
+          sku: null
+        });
+
+        console.log('Buy Now product added:', {
+          name: product.name,
+          price: price,
+          quantity: item.quantity
+        });
+      }
+    } else {
+      // ❌ NORMAL CHECKOUT - Use cart from database
+      console.log('🛒 Normal checkout - Using cart from database');
+      const cart = await Cart.findOne({ user: req.user.id })
+        .populate({
+          path: 'items.product',
+          model: 'Product',
+          select: 'name basePrice stock images variants'
+        });
+
+      if (!cart || cart.items.length === 0) {
         return res.status(400).json({
           success: false,
-          message: `Insufficient stock for ${product.name}`
+          message: 'Cart is empty',
         });
       }
 
-      const itemTotal = item.quantity * price;
-      totalAmount += itemTotal;
+      console.log('Processing cart items:', cart.items.length);
 
-      // Calculate discount percentage if original price is higher
-      let discountPercentage = 0;
-      if (originalPrice > price) {
-        discountPercentage = Math.round(((originalPrice - price) / originalPrice) * 100);
+      for (const item of cart.items) {
+        if (!item.product || !item.product._id) {
+          console.error('Invalid product in cart item:', item);
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid product in cart',
+          });
+        }
+
+        const product = await Product.findById(item.product._id);
+        if (!product) {
+          return res.status(400).json({
+            success: false,
+            message: `Product not found`,
+          });
+        }
+
+        const price = item.price;
+        const variantId = item.variantId;
+        const variantName = item.variantName || '';
+        let variant = null;
+        let originalPrice = price;
+
+        if (variantId && product.variants && product.variants.length > 0) {
+          variant = product.variants.find(v => v._id.toString() === variantId);
+          if (variant) {
+            originalPrice = variant.originalPrice || variant.price || price;
+          }
+        }
+
+        if (typeof price !== 'number' || isNaN(price) || price <= 0) {
+          console.error('Invalid price from cart:', {
+            productId: product._id,
+            productName: product.name,
+            cartPrice: price,
+            variantName
+          });
+          return res.status(400).json({
+            success: false,
+            message: `Invalid price for ${product.name}`
+          });
+        }
+
+        if (variant) {
+          if (variant.stock < item.quantity) {
+            return res.status(400).json({
+              success: false,
+              message: `Insufficient stock for ${product.name} - ${variantName}`
+            });
+          }
+        } else if (product.stock < item.quantity) {
+          return res.status(400).json({
+            success: false,
+            message: `Insufficient stock for ${product.name}`
+          });
+        }
+
+        const itemTotal = item.quantity * price;
+        totalAmount += itemTotal;
+
+        let discountPercentage = 0;
+        if (originalPrice > price) {
+          discountPercentage = Math.round(((originalPrice - price) / originalPrice) * 100);
+        }
+
+        const productImage = product.images && product.images.length > 0
+          ? product.images[0].image
+          : null;
+
+        productsToOrder.push({
+          product: product._id,
+          variantId: variantId,
+          variantName: variantName,
+          quantity: item.quantity,
+          price: price,
+          originalPrice: originalPrice,
+          discountPercentage: discountPercentage,
+          name: product.name,
+          image: productImage,
+          sku: null
+        });
+
+        console.log('Product added to order from cart:', {
+          name: product.name,
+          variant: variantName || 'None',
+          priceFromCart: price,
+          quantity: item.quantity,
+          itemTotal
+        });
       }
-
-      // Get product image
-      const productImage = product.images && product.images.length > 0 
-        ? product.images[0].image 
-        : null;
-
-      products.push({
-        product: product._id,
-        variantId: variantId,
-        variantName: variantName,
-        // ✅ ADDED: Weight fields
-        // weight: variant?.weight || 0,
-        // weightUnit: variant?.weightUnit || 'gram',
-        quantity: item.quantity,
-        price: price, // ✅ Use the price from cart (299 or 499)
-        originalPrice: originalPrice,
-        discountPercentage: discountPercentage,
-        name: product.name,
-        image: productImage,
-        sku: null // You can add this if you have SKU in cart
-      });
-
-      console.log('Product added to order from cart:', {
-        name: product.name,
-        variant: variantName || 'None',
-        priceFromCart: price, // This should show 299 and 499
-        quantity: item.quantity,
-        // weight: variant?.weight || 0,
-        weightUnit: variant?.weightUnit || 'gram',
-        itemTotal
-      });
     }
 
     // Validate totalAmount
@@ -536,11 +578,11 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    console.log('Total amount from cart items:', totalAmount);
+    console.log('Total amount:', totalAmount);
 
     // Calculate shipping, tax, and final amount
-    const shippingFee = 0; 
-    const taxAmount = Math.round(totalAmount * 5) / 100; // 5% tax
+    const shippingFee = 0;
+    const taxAmount = Math.round(totalAmount * 5) / 100;
     const finalAmount = totalAmount + shippingFee + taxAmount;
 
     console.log('Amount calculations:', {
@@ -550,11 +592,10 @@ export const createOrder = async (req, res) => {
       finalAmount
     });
 
-    // Don't generate orderId manually - let the model's pre-save hook do it
     // Create order with the data
     const orderData = {
       user: req.user.id,
-      products: products,
+      products: productsToOrder,
       shippingAddress,
       paymentMethod,
       paymentId: paymentMethod !== 'cod' ? paymentId : undefined,
@@ -565,7 +606,7 @@ export const createOrder = async (req, res) => {
       taxAmount: Number(taxAmount.toFixed(2)),
       finalAmount: Number(finalAmount.toFixed(2)),
       subtotal: totalAmount,
-      discountAmount: products.reduce((sum, item) => {
+      discountAmount: productsToOrder.reduce((sum, item) => {
         if (item.originalPrice > item.price) {
           return sum + ((item.originalPrice - item.price) * item.quantity);
         }
@@ -591,35 +632,25 @@ export const createOrder = async (req, res) => {
         variant: p.variantName,
         price: p.price,
         quantity: p.quantity,
-        weight: p.weight,
-        weightUnit: p.weightUnit
       }))
     });
 
     // For COD payments, update stock immediately
     if (paymentMethod === 'cod') {
       try {
-        // Update stock for COD orders
-        for (const item of products) {
+        for (const item of productsToOrder) {
           const product = await Product.findById(item.product);
-          
           if (product) {
             if (item.variantId && product.variants && product.variants.length > 0) {
-              // Update variant stock
-              const variantIndex = product.variants.findIndex(v => 
-                v._id.toString() === item.variantId
-              );
-              
+              const variantIndex = product.variants.findIndex(v => v._id.toString() === item.variantId);
               if (variantIndex !== -1) {
                 product.variants[variantIndex].stock -= item.quantity;
-                // Update total product stock
                 const totalStock = product.variants.reduce((sum, variant) => sum + (variant.stock || 0), 0);
                 product.stock = totalStock;
                 await product.save();
                 console.log(`Updated variant stock for ${product.name}: -${item.quantity}`);
               }
             } else {
-              // Update product stock
               product.stock -= item.quantity;
               await product.save();
               console.log(`Updated product stock for ${product.name}: -${item.quantity}`);
@@ -627,7 +658,6 @@ export const createOrder = async (req, res) => {
           }
         }
 
-        // Send confirmation email for COD
         try {
           await sendOrderConfirmation(order._id);
           console.log('Order confirmation email sent for COD order');
@@ -636,12 +666,16 @@ export const createOrder = async (req, res) => {
         }
       } catch (stockError) {
         console.error('Stock update failed for COD order:', stockError);
-        // Don't fail the order if stock update fails
       }
     }
-    
-    // Clear cart
-    await Cart.findOneAndUpdate({ user: req.user.id }, { $set: { items: [] } });
+
+    // Only clear cart if NOT in Buy Now mode
+    if (!skipCartClear) {
+      await Cart.findOneAndUpdate({ user: req.user.id }, { $set: { items: [] } });
+      console.log(`🗑️ Cart cleared for user ${req.user.id} (normal checkout)`);
+    } else {
+      console.log(`🛒 Buy Now mode - Cart NOT cleared for user ${req.user.id} (cart preserved)`);
+    }
 
     res.status(201).json({
       success: true,
@@ -652,8 +686,6 @@ export const createOrder = async (req, res) => {
 
   } catch (error) {
     console.error('Create order error:', error);
-    
-    // Handle validation errors
     if (error.name === 'ValidationError') {
       const validationErrors = Object.values(error.errors).map(err => err.message);
       console.error('Validation errors:', validationErrors);
@@ -663,24 +695,19 @@ export const createOrder = async (req, res) => {
         errors: validationErrors
       });
     }
-    
-    // Handle cast errors
     if (error.name === 'CastError') {
       console.error('Cast error:', error.message);
-      return res.status(400).json({
+      return res.status(500).json({
         success: false,
-        message: 'Invalid data format',
-        error: error.message
+        message: 'Internal server error',
       });
     }
-    
     res.status(500).json({
       success: false,
       message: error.message || 'Internal server error',
     });
   }
 };
-
 // @desc    Update order payment success (for Razorpay verification)
 // @route   PUT /api/orders/payment-success
 // @access  Public (called by Razorpay webhook)
