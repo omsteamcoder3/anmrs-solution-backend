@@ -23,6 +23,7 @@ import whatWeOfferRoutes from './routes/whatWeOfferRoutes.js';
 import clientRoutes from './routes/clientRoutes.js';
 import mapAndLogoRoutes from './routes/mapandlogoRoutes.js';
 import designOrderRoutes from './routes/designOrderRoutes.js';
+import razorpayWebhook from './routes/razorpayWebhook.js';
 
 import './models/UserModel.js';
 // -------------------------------
@@ -117,6 +118,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/admin/settings', settingsRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/design-orders', designOrderRoutes);
+app.use('/api/webhooks', razorpayWebhook);
 
 
 app.get('/', (req, res) => res.json({ message: 'E-commerce backend running' }));

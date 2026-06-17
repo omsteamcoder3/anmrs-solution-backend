@@ -44,7 +44,14 @@ const designOrderSchema = new mongoose.Schema({
     min: 1,
     default: 1
   },
-
+totalPrice: {
+  type: Number,
+  default: 0
+},
+productPrice: {
+  type: Number,
+  default: 0
+},
   size: {
     type: String,
     required: true,
@@ -67,6 +74,36 @@ const designOrderSchema = new mongoose.Schema({
     enum: ['Premium Plastic', 'Standard Plastic', 'PVC', 'Composite', 'Paper'],
     default: 'Premium Plastic'
   },
+// Add after 'material' field or before 'additionalText'
+
+  // Delivery & Payment
+  deliveryMethod: {
+    type: String,
+    enum: ['pickup', 'door_delivery'],
+    default: 'pickup'
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['cod', 'razorpay'],
+    default: 'cod'
+  },
+  deliveryAddress: {
+    street: String,
+    city: String,
+    state: String,
+    pincode: String
+  },
+  deliveryCharge: {
+    type: Number,
+    default: 0
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'paid', 'failed'],
+    default: 'pending'
+  },
+  razorpayOrderId: String,
+  razorpayPaymentId: String,
 
   additionalText: {
     cardHolderName: String,
@@ -75,12 +112,11 @@ const designOrderSchema = new mongoose.Schema({
     specialInstructions: String
   },
 
-  // Status tracking
-  status: {
-    type: String,
-    enum: ['pending', 'design_review', 'approved', 'printing', 'completed', 'cancelled', 'rejected'],
-    default: 'pending'
-  },
+status: {
+  type: String,
+  enum: ['pending', 'design_review', 'approved', 'printing', 'completed', 'cancelled', 'rejected', 'in_process', 'ready_for_pickup', 'out_for_delivery'],
+  default: 'pending'
+},
 
   statusHistory: [{
     status: String,
@@ -100,6 +136,24 @@ const designOrderSchema = new mongoose.Schema({
     reviewedAt: Date
   },
 
+
+// Add after 'status' field
+expectedCompletionDate: {
+  type: Date,
+  default: null
+},
+actualCompletionDate: {
+  type: Date,
+  default: null
+},
+emailNotifications: [{
+  type: {
+    type: String,
+    enum: ['processing_started', 'ready_for_pickup', 'out_for_delivery', 'payment_reminder','payment_link']
+  },
+  sentAt: Date,
+  status: String
+}],
   // Timestamps
   submittedAt: {
     type: Date,
