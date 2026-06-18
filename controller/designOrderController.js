@@ -163,11 +163,43 @@ const processAndOptimizeFiles = async (req, res, next) => {
     });
   }
 };
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET
-});
+// ==================== GET RAZORPAY KEYS FROM DATABASE ====================
+const getRazorpayKeys = async () => {
+  try {
+    const Setting = (await import('../models/Setting.js')).default;
+    const settings = await Setting.findOne();
+    
+    if (!settings) {
+      console.error('❌ Settings not found in database');
+      return null;
+    }
+    
+    if (!settings.razorpayKeyId || !settings.razorpayKeySecret) {
+      console.error('❌ Razorpay keys not configured in database');
+      return null;
+    }
+    
+    return {
+      key_id: settings.razorpayKeyId,
+      key_secret: settings.razorpayKeySecret
+    };
+  } catch (error) {
+    console.error('❌ Error fetching Razorpay keys:', error.message);
+    return null;
+  }
+};
 
+// ==================== GET RAZORPAY INSTANCE ====================
+const getRazorpayInstance = async () => {
+  const keys = await getRazorpayKeys();
+  if (!keys) {
+    throw new Error('Razorpay keys not configured');
+  }
+  return new Razorpay({
+    key_id: keys.key_id,
+    key_secret: keys.key_secret
+  });
+};
 
 // ==================== ORDER SUBMISSION ====================
 export const submitDesignOrder = async (req, res) => {
@@ -534,7 +566,6 @@ export const createRazorpayPaymentLink = async (req, res) => {
     console.log(`📦 Found order: ${order.orderNumber}`);
     console.log(`💰 Total Price: ${order.totalPrice}`);
 
-    // ✅ Check if totalPrice is valid
     const totalAmount = order.totalPrice || 0;
     
     if (totalAmount <= 0) {
@@ -547,8 +578,11 @@ export const createRazorpayPaymentLink = async (req, res) => {
 
     console.log(`💰 Creating payment link for ₹${totalAmount}`);
 
+    // ✅ Get Razorpay instance from database
+    const razorpay = await getRazorpayInstance();
+
     const options = {
-      amount: Math.round(totalAmount * 100), // Amount in paise
+      amount: Math.round(totalAmount * 100),
       currency: 'INR',
       accept_partial: false,
       description: `Design Order #${order.orderNumber}`,
@@ -579,7 +613,6 @@ export const createRazorpayPaymentLink = async (req, res) => {
     
     console.log('✅ Payment link created:', paymentLink.short_url);
     
-    // Save the payment link ID in order
     order.razorpayOrderId = paymentLink.id;
     await order.save();
 
@@ -612,7 +645,7 @@ export const verifyRazorpayPayment = async (req, res) => {
     
     // Create a crypto instance
     const crypto = require('crypto');
-    const secret = process.env.RAZORPAY_KEY_SECRET || 'Qzp1upRRCpfwgpkld2eKrVLh';
+    const secret = process.env.RAZORPAY_KEY_SECRET 
     
     // Generate signature to verify
     const generatedSignature = crypto
@@ -705,13 +738,11 @@ export const checkRazorpayPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
     
-    // If already marked as paid in database
     if (order.paymentStatus === 'paid') {
       console.log('✅ Payment already marked as paid in database');
       return res.json({ success: true, paymentStatus: 'paid', message: 'Already paid' });
     }
     
-    // Check if we have a Razorpay order ID
     if (!order.razorpayOrderId) {
       console.log('❌ No Razorpay order ID found');
       return res.json({ 
@@ -722,34 +753,27 @@ export const checkRazorpayPayment = async (req, res) => {
     
     console.log(`📦 Razorpay Order ID: ${order.razorpayOrderId}`);
     
-    // Initialize Razorpay
-    const razorpay = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID,
-      key_secret: process.env.RAZORPAY_KEY_SECRET
-    });
-    
     try {
-      // Fetch the payment link from Razorpay
+      // ✅ Get Razorpay instance from database
+      const razorpay = await getRazorpayInstance();
+      
       console.log('📤 Fetching payment link from Razorpay...');
       const paymentLink = await razorpay.paymentLink.fetch(order.razorpayOrderId);
       
       console.log(`📊 Payment Link Status: ${paymentLink.status}`);
       console.log(`📊 Payment Link Data:`, JSON.stringify(paymentLink, null, 2));
       
-      // Check payment status - Razorpay uses 'paid' or 'captured' for successful payments
       const isPaid = paymentLink.status === 'paid' || paymentLink.status === 'captured';
       
       if (isPaid) {
         console.log('✅ Payment is successful! Updating order...');
         
-        // Try to get payment ID from the payment link
         let paymentId = '';
         if (paymentLink.payments && paymentLink.payments.data && paymentLink.payments.data.length > 0) {
           paymentId = paymentLink.payments.data[0].id;
           console.log(`💳 Payment ID: ${paymentId}`);
         }
         
-        // Update order
         order.paymentStatus = 'paid';
         if (paymentId) {
           order.razorpayPaymentId = paymentId;
@@ -764,7 +788,6 @@ export const checkRazorpayPayment = async (req, res) => {
         });
       }
       
-      // Payment is still pending or other status
       console.log(`⏳ Payment status: ${paymentLink.status}`);
       return res.json({ 
         success: true, 
